@@ -3,3 +3,7 @@ psycopg[binary]==3.2.13
 python-dotenv==1.1.1
 openai==2.44.0
 pypdf==5.1.0
+
+# RAG — embeddings locais (ONNX, sem GPU e sem chave de API) e banco vetorial
+fastembed==0.8.0
+chromadb==1.5.9

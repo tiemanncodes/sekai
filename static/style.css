@@ -1,0 +1,666 @@
+/* Sekai — calma, espaço vazio (ma), uma cor só. */
+
+:root {
+  --papel: #fafaf8;
+  --tinta: #22231e;
+  --tinta-fraca: #5d5f56; /* escurecido: contraste 6.1:1 sobre o papel */
+  --musgo: #566053;       /* único destaque, desaturado (mais cinza que verde) */
+  --musgo-claro: #dbe4d5; /* verde claro — só a bolha do usuário no chat */
+  --linha: rgba(34, 35, 30, 0.14);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1.25rem;
+  background: var(--papel);
+  color: var(--tinta);
+  font-family: Inter, -apple-system, system-ui, sans-serif;
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Dois campos de cor larguíssimos e quase invisíveis dão profundidade ao
+   blur do card — sem eles o glassmorfismo não tem o que desfocar. */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(90px);
+  pointer-events: none;
+  z-index: 0;
+}
+body::before {
+  width: 34rem; height: 34rem;
+  top: -12rem; left: -10rem;
+  background: rgba(85, 101, 79, 0.16);
+}
+body::after {
+  width: 26rem; height: 26rem;
+  bottom: -10rem; right: -8rem;
+  background: rgba(186, 174, 155, 0.2);
+}
+
+.card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 30rem;
+  padding: 3.5rem 3rem;
+  /* fundo quase opaco por padrão: se o navegador não fizer o blur,
+     o texto continua legível em vez de ficar sobre um vidro sem vidro */
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 20px;
+  box-shadow: 0 1px 40px rgba(34, 35, 30, 0.06);
+}
+
+/* o vidro só entra se o navegador souber desfocar */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .card {
+    background: rgba(255, 255, 255, 0.62);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--musgo);
+  margin: 0 0 2.5rem;
+}
+
+.enso {
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  /* o ensō é traçado num gesto só: desenha na entrada e fica */
+  animation: tracar 1.6s cubic-bezier(0.33, 0, 0.15, 1) both;
+}
+
+@keyframes tracar {
+  from { opacity: 0; transform: rotate(-32deg) scale(0.9); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enso { animation: none; }
+}
+
+h1 {
+  font-size: 1.875rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  margin: 0 0 0.625rem;
+}
+
+.sub {
+  margin: 0 0 2.5rem;
+  font-size: 1rem;
+  color: var(--tinta-fraca);
+}
+
+label {
+  display: block;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--tinta);
+  margin-bottom: 0.5rem;
+}
+
+.dica {
+  font-weight: 400;
+  color: var(--tinta-fraca);
+}
+
+input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  margin-bottom: 1.5rem;
+  font: inherit;
+  font-size: 1.0625rem;
+  color: var(--tinta);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--linha);
+  border-radius: 12px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+input:focus {
+  outline: none;
+  border-color: var(--musgo);
+  box-shadow: 0 0 0 3px rgba(85, 101, 79, 0.16);
+}
+
+button {
+  width: 100%;
+  padding: 1rem;
+  font: inherit;
+  font-size: 1.0625rem;
+  font-weight: 500;
+  color: #fff;
+  background: var(--musgo);
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+button:hover { background: #47563f; }
+button:active { transform: scale(0.99); }
+button:focus-visible {
+  outline: 2px solid var(--musgo);
+  outline-offset: 3px;
+}
+
+.erro {
+  margin: 0 0 1.5rem;
+  padding: 0.875rem 1rem;
+  background: rgba(85, 101, 79, 0.07);
+  border-left: 3px solid var(--musgo);
+  border-radius: 0 10px 10px 0;
+  font-size: 0.9375rem;
+  color: var(--tinta);
+}
+
+.rodape {
+  margin: 2rem 0 0;
+  font-size: 0.9375rem;
+  color: var(--tinta-fraca);
+  text-align: center;
+}
+.rodape a {
+  color: var(--musgo);
+  font-weight: 500;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(85, 101, 79, 0.3);
+}
+.rodape a:hover { border-bottom-color: var(--musgo); }
+
+.sair {
+  width: auto;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.9375rem;
+  background: transparent;
+  color: var(--tinta-fraca);
+  border: 1px solid var(--linha);
+  border-radius: 12px;
+}
+.sair:hover {
+  background: rgba(85, 101, 79, 0.06);
+  color: var(--tinta);
+}
+
+@media (max-width: 30rem) {
+  .card { padding: 2.5rem 1.75rem; border-radius: 16px; }
+  h1 { font-size: 1.625rem; }
+}
+
+/* ───────────────────────────────────────────────────────────────────
+   Chat público — tela cheia, sem card (estilo Duck.ai).
+
+   .chat-pagina ocupa o viewport inteiro (position:fixed;inset:0), então
+   ela não participa da rolagem da página — só o .chat-mensagens rola,
+   por dentro. Isso é o que resolve o bug do símbolo "caindo": antes ele
+   era um elemento normal que subia junto com a página quando a conversa
+   crescia. Agora .chat-header é sobreposto (position:absolute dentro do
+   wrapper fixo) e as mensagens passam por baixo dele, meio apagadas pela
+   máscara de degradê — o efeito de "sumir atrás do vidro".
+   ─────────────────────────────────────────────────────────────────── */
+
+.chat-pagina {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.chat-header {
+  position: absolute;
+  top: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 1.75rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 4px 30px rgba(34, 35, 30, 0.08);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .chat-header {
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+}
+
+.chat-header .enso {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.chat-marca-texto {
+  font-size: 1.125rem;
+  font-weight: 500;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--musgo);
+}
+
+.chat-mensagens {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 44rem;
+  display: flex;
+  /* column-reverse — não justify-content:flex-end. Motivo: com direção
+     normal + flex-end, boa parte dos navegadores calcula errado a área
+     rolável quando o conteúdo passa do topo (o scroll simplesmente some).
+     column-reverse é a técnica padrão de app de chat: o primeiro item no
+     DOM (mensagem mais nova) senta no início do eixo principal, que aqui
+     é embaixo — então mensagens curtas ficam coladas no input, e quando
+     enche a tela, a rolagem funciona normalmente e sem bugs.
+     .chat-tagline foge dessa regra via margin:auto (auto-margin no eixo
+     principal do flex vence o justify-content só pra esse item, então o
+     estado vazio continua centralizado na vertical). */
+  flex-direction: column-reverse;
+  gap: 1.25rem;
+  overflow-y: auto;
+  padding: 5.5rem 1.5rem 1rem;
+  /* degradê no topo: o conteúdo desaparece suavemente atrás do cabeçalho
+     de vidro em vez de cortar seco — visível quando dá scroll pra cima */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 4rem);
+  mask-image: linear-gradient(to bottom, transparent 0, black 4rem);
+  /* scrollbar quase invisível — só um traço fino que escurece um pouco no hover */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 35, 30, 0.14) transparent;
+}
+
+.chat-mensagens::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-mensagens::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-mensagens::-webkit-scrollbar-thumb {
+  background: rgba(34, 35, 30, 0.12);
+  border-radius: 999px;
+}
+
+.chat-mensagens::-webkit-scrollbar-thumb:hover {
+  background: rgba(34, 35, 30, 0.24);
+}
+
+.chat-tagline {
+  flex-shrink: 0;
+  margin: auto 0;
+  font-size: 1.1875rem;
+  color: var(--tinta-fraca);
+  text-align: center;
+}
+
+.chat-pagina--conversando .chat-tagline {
+  display: none;
+}
+
+/* Mensagem do usuário: bolha, alinhada à direita — igual antes.
+   Mensagem do agente: texto livre, sem caixa, largura quase total — é o
+   pedido explícito de "como o Claude e o ChatGPT", sem bolha de fundo. */
+.chat-msg {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.chat-msg-texto {
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.chat-msg--usuario {
+  align-self: flex-end;
+  max-width: 80%;
+  padding: 0.875rem 1.25rem;
+  border-radius: 16px;
+  background: var(--musgo-claro);
+  color: var(--tinta);
+  border-bottom-right-radius: 4px;
+}
+
+.chat-msg--agente {
+  align-self: stretch;
+  max-width: 100%;
+  color: var(--tinta);
+  padding: 0.125rem 0.25rem;
+}
+
+.chat-msg strong {
+  font-weight: 600;
+}
+
+/* Chip de arquivo dentro da mensagem — ícone+nome (PDF, ou imagem sem
+   preview salvo) ou a foto de verdade quando é a mensagem recém-enviada
+   (ver construirAnexoPreview no JS: usa object URL, não vai pro banco). */
+.chat-anexo-msg {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+}
+
+.chat-anexo-msg svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+}
+
+.chat-anexo-imagem {
+  display: block;
+  max-width: 100%;
+  max-height: 16rem;
+  border-radius: 12px;
+}
+
+/* Ações abaixo de cada resposta do agente: copiar, curtir, não curtir.
+   Discretas até o hover — não competem com o texto da resposta. */
+.chat-acoes {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  margin-top: -0.125rem;
+}
+
+.chat-acao {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border-radius: 999px;
+  color: var(--tinta-fraca);
+  opacity: 0.6;
+  transition: opacity 0.15s, background-color 0.15s, color 0.15s;
+}
+
+.chat-acao svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.chat-acao:hover {
+  opacity: 1;
+  background: rgba(85, 96, 83, 0.1);
+  color: var(--tinta);
+}
+
+/* Dislike reaproveita o mesmo ícone de "curtir", só espelhado — evita
+   depender de um segundo desenho de ícone que eu poderia errar */
+.chat-acao--dislike svg {
+  transform: scaleY(-1);
+}
+
+.chat-acao--ativo {
+  opacity: 1;
+  color: var(--musgo);
+  background: rgba(85, 96, 83, 0.14);
+}
+
+.chat-acao--copiar.chat-acao--feito {
+  opacity: 1;
+  color: var(--musgo);
+}
+
+.chat-acao--copiar.chat-acao--erro {
+  opacity: 1;
+  color: #a33d3d;
+}
+
+/* Indicador de "pensando": o ensō girando, sem bolha, discreto */
+.chat-carregando {
+  flex-shrink: 0;
+  align-self: flex-start;
+  padding: 0.25rem;
+  opacity: 0.7;
+}
+
+.chat-carregando .enso {
+  width: 1.375rem;
+  height: 1.375rem;
+  animation: girar 1s linear infinite;
+}
+
+@keyframes girar {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-carregando .enso { animation: none; }
+}
+
+.chat-rodape {
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 44rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0 1.5rem 1.5rem;
+}
+
+/* Chip do arquivo selecionado, acima da barra. O seletor :not([hidden])
+   é necessário porque display:flex de uma classe empata em especificidade
+   com [hidden]{display:none} do navegador — sem isso o CSS do autor
+   sempre vence e o elemento aparece mesmo com o atributo hidden. */
+.chat-anexo:not([hidden]) {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  font-size: 0.875rem;
+  color: var(--tinta-fraca);
+}
+
+.chat-anexo #chat-anexo-nome {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#chat-anexo-remover {
+  flex-shrink: 0;
+  width: auto;
+  padding: 0 0.375rem;
+  background: none;
+  border: none;
+  color: var(--tinta-fraca);
+  font-size: 1.125rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+#chat-anexo-remover:hover {
+  color: var(--tinta);
+}
+
+/* A caixa de composição — duas linhas (texto em cima, ferramentas embaixo),
+   canto mais fechado que uma pílula pura pra caber o layout de duas fileiras. */
+.chat-barra {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 26px;
+  padding: 0.875rem 1rem 0.625rem 1.375rem;
+  box-shadow: 0 4px 30px rgba(34, 35, 30, 0.08);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .chat-barra {
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+}
+
+.chat-barra:focus-within {
+  border-color: rgba(85, 101, 79, 0.4);
+  box-shadow: 0 0 0 3px rgba(85, 101, 79, 0.12);
+}
+
+.chat-barra input {
+  width: 100%;
+  padding: 0.25rem 0;
+  margin: 0;
+  font-size: 1.1875rem;
+  border: none;
+  background: transparent;
+}
+
+.chat-barra input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.chat-barra-ferramentas {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chat-anexar {
+  flex-shrink: 0;
+  width: 2.375rem;
+  height: 2.375rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tinta-fraca);
+}
+
+.chat-anexar:hover {
+  background: rgba(85, 96, 83, 0.1);
+  color: var(--tinta);
+}
+
+.chat-anexar:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chat-anexar svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Botões com o mesmo acabamento de vidro do cabeçalho e da barra — cor
+   translúcida + blur, mas opacidade alta o bastante pra manter contraste
+   (vidro genuinamente transparente, com ~50% de opacidade, falha no
+   contraste WCAG; por isso o verde aqui é mais concentrado que o branco
+   do cabeçalho). */
+.chat-enviar,
+.chat-cta button {
+  background: rgba(69, 84, 64, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .chat-enviar,
+  .chat-cta button {
+    background: rgba(69, 84, 64, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
+
+.chat-enviar {
+  flex-shrink: 0;
+  width: 2.875rem;
+  height: 2.875rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+}
+
+.chat-enviar:hover {
+  background: rgba(69, 84, 64, 0.98);
+}
+
+.chat-enviar:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chat-enviar svg {
+  width: 1.3125rem;
+  height: 1.3125rem;
+}
+
+.chat-rodape-texto {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--tinta-fraca);
+  text-align: center;
+}
+
+.chat-rodape-texto a {
+  color: var(--tinta-fraca);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.chat-rodape-texto a:hover {
+  color: var(--tinta);
+}
+
+.chat-cta {
+  width: 100%;
+  padding-top: 1rem;
+  border-top: 1px solid var(--linha);
+  text-align: center;
+}
+
+.chat-cta a {
+  text-decoration: none;
+}
+
+@media (max-width: 30rem) {
+  .chat-header { padding: 0.55rem 1.25rem; gap: 0.5rem; }
+  .chat-header .enso { width: 1.875rem; height: 1.875rem; }
+  .chat-marca-texto { font-size: 0.9375rem; }
+  .chat-mensagens { padding: 4.5rem 1rem 1rem; }
+  .chat-rodape { padding: 0 1rem 1.25rem; }
+}

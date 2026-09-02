@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+{% block titulo %}Sekai — converse com um agente{% endblock %}
+
+{% block corpo %}
+<div class="chat-pagina{{ ' chat-pagina--conversando' if mensagens else '' }}" id="chat-pagina">
+
+  <header class="chat-header">
+    {% include "_enso.html" %}
+    <span class="chat-marca-texto">Sekai</span>
+  </header>
+
+  <div id="chat-mensagens" class="chat-mensagens" role="log" aria-live="polite">
+    <p class="chat-tagline" id="chat-tagline">Converse com um agente. Sem cadastro, sem custo.</p>
+    {% for m in mensagens|reverse %}
+      <div class="chat-msg chat-msg--{{ 'usuario' if m.role == 'user' else 'agente' }}">
+        {% if m.anexo %}
+          <div class="chat-anexo-msg">
+            {% include "_icone_arquivo.html" %}
+            <span>{{ m.anexo.nome }}</span>
+          </div>
+        {% endif %}
+        {% if m.content %}<div class="chat-msg-texto">{{ m.content | bolha }}</div>{% endif %}
+        {% if m.role != 'user' %}
+          <div class="chat-acoes">
+            <button type="button" class="chat-acao chat-acao--copiar" aria-label="Copiar resposta" data-texto="{{ m.content | plano }}">{% include "_icone_copiar.html" %}</button>
+            <button type="button" class="chat-acao chat-acao--like" aria-label="Gostei">{% include "_icone_curtir.html" %}</button>
+            <button type="button" class="chat-acao chat-acao--dislike" aria-label="Não gostei">{% include "_icone_curtir.html" %}</button>
+          </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <template id="chat-enso-tpl">{% include "_enso.html" %}</template>
+  <template id="chat-icone-copiar-tpl">{% include "_icone_copiar.html" %}</template>
+  <template id="chat-icone-curtir-tpl">{% include "_icone_curtir.html" %}</template>
+  <template id="chat-icone-arquivo-tpl">{% include "_icone_arquivo.html" %}</template>
+
+  <div class="chat-rodape">
+    <div id="chat-anexo" class="chat-anexo" hidden>
+      <span id="chat-anexo-nome"></span>
+      <button type="button" id="chat-anexo-remover" aria-label="Remover arquivo">×</button>
+    </div>
+
+    <form id="chat-form" class="chat-barra" autocomplete="off">
+      <input id="chat-input" type="text" placeholder="Pergunte o que quiser..." maxlength="1000"
+             {{ 'disabled' if restantes <= 0 }} autofocus>
+      <input type="file" id="chat-arquivo" accept="image/png,image/jpeg,image/webp,application/pdf" hidden>
+
+      <div class="chat-barra-ferramentas">
+        <button type="button" id="chat-anexar" class="chat-anexar" aria-label="Anexar arquivo" {{ 'disabled' if restantes <= 0 }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21.44 11.05l-9.19 9.19a5 5 0 01-7.07-7.07l9.19-9.19a3.5 3.5 0 015 5l-9.2 9.19a1.5 1.5 0 01-2.12-2.12l8.49-8.48"/>
+          </svg>
+        </button>
+        <button type="submit" class="chat-enviar" aria-label="Enviar" {{ 'disabled' if restantes <= 0 }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 19V5"/>
+            <path d="M6 11l6-6 6 6"/>
+          </svg>
+        </button>
+      </div>
+    </form>
+
+    <div id="chat-cta" class="chat-cta" {{ 'hidden' if restantes > 0 }}>
+      <p class="sub" style="margin-bottom: 0.75rem;">Gostou? Crie sua conta e monte um agente só seu.</p>
+      <a href="{{ url_for('cadastro') }}"><button type="button">Criar conta</button></a>
+    </div>
+
+    <p class="chat-rodape-texto">
+      <span id="chat-restantes">{% if restantes > 0 %}{{ restantes }} {{ 'mensagem restante' if restantes == 1 else 'mensagens restantes' }} nesta demonstração.{% else %}Você chegou ao limite da demonstração.{% endif %}</span>
+      Já tem conta? <a href="{{ url_for('login') }}">Entrar</a>
+    </p>
+  </div>
+</div>
+
+<script>
+  const pagina = document.getElementById('chat-pagina');
+  const form = document.getElementById('chat-form');
+  const input = document.getElementById('chat-input');
+  const lista = document.getElementById('chat-mensagens');
+  const restantesEl = document.getElementById('chat-restantes');
+  const cta = document.getElementById('chat-cta');
+  const botaoAnexar = document.getElementById('chat-anexar');
+  const campoArquivo = document.getElementById('chat-arquivo');
+  const anexoChip = document.getElementById('chat-anexo');
+  const anexoNome = document.getElementById('chat-anexo-nome');
+  const anexoRemover = document.getElementById('chat-anexo-remover');
+  const botaoEnviar = form.querySelector('.chat-enviar');
+
+  const tplEnso = document.getElementById('chat-enso-tpl');
+  const tplIconeCopiar = document.getElementById('chat-icone-copiar-tpl');
+  const tplIconeCurtir = document.getElementById('chat-icone-curtir-tpl');
+  const tplIconeArquivo = document.getElementById('chat-icone-arquivo-tpl');
+
+  function escaparHtml(texto) {
+    const d = document.createElement('div');
+    d.textContent = texto;
+    return d.innerHTML;
+  }
+
+  function formatarTexto(texto) {
+    // Mesma regra do lado do servidor (ver chat.py: formatar_bolha):
+    // escapa tudo primeiro, só depois converte **negrito** em <strong>.
+    return escaparHtml(texto).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  }
+
+  function paraTextoPlano(texto) {
+    return texto.replace(/\*\*(.+?)\*\*/g, '$1');
+  }
+
+  function construirAcoes(textoOriginal) {
+    const container = document.createElement('div');
+    container.className = 'chat-acoes';
+
+    const copiar = document.createElement('button');
+    copiar.type = 'button';
+    copiar.className = 'chat-acao chat-acao--copiar';
+    copiar.setAttribute('aria-label', 'Copiar resposta');
+    copiar.dataset.texto = paraTextoPlano(textoOriginal);
+    copiar.appendChild(tplIconeCopiar.content.cloneNode(true));
+    container.appendChild(copiar);
+
+    const like = document.createElement('button');
+    like.type = 'button';
+    like.className = 'chat-acao chat-acao--like';
+    like.setAttribute('aria-label', 'Gostei');
+    like.appendChild(tplIconeCurtir.content.cloneNode(true));
+    container.appendChild(like);
+
+    const dislike = document.createElement('button');
+    dislike.type = 'button';
+    dislike.className = 'chat-acao chat-acao--dislike';
+    dislike.setAttribute('aria-label', 'Não gostei');
+    dislike.appendChild(tplIconeCurtir.content.cloneNode(true));
+    container.appendChild(dislike);
+
+    return container;
+  }
+
+  function construirAnexoPreview(anexo) {
+    const div = document.createElement('div');
+    div.className = 'chat-anexo-msg';
+    if (anexo.tipo === 'imagem' && anexo.arquivo) {
+      const img = document.createElement('img');
+      img.className = 'chat-anexo-imagem';
+      img.src = URL.createObjectURL(anexo.arquivo);
+      img.alt = anexo.nome;
+      div.appendChild(img);
+    } else {
+      div.appendChild(tplIconeArquivo.content.cloneNode(true));
+      const span = document.createElement('span');
+      span.textContent = anexo.nome;
+      div.appendChild(span);
+    }
+    return div;
+  }
+
+  function mensagem(texto, papel, anexo) {
+    const div = document.createElement('div');
+    div.className = 'chat-msg chat-msg--' + papel;
+
+    if (anexo) {
+      div.appendChild(construirAnexoPreview(anexo));
+    }
+    if (texto) {
+      const corpo = document.createElement('div');
+      corpo.className = 'chat-msg-texto';
+      if (papel === 'agente') {
+        corpo.innerHTML = formatarTexto(texto);
+      } else {
+        corpo.textContent = texto;
+      }
+      div.appendChild(corpo);
+    }
+    if (papel === 'agente') {
+      div.appendChild(construirAcoes(texto));
+    }
+
+    // column-reverse: o primeiro filho no DOM aparece embaixo (mais recente).
+    // Por isso "adicionar mensagem nova" é sempre no início, nunca no fim.
+    lista.prepend(div);
+    lista.scrollTop = 0;
+    pagina.classList.add('chat-pagina--conversando');
+    return div;
+  }
+
+  function mostrarCarregando() {
+    const div = document.createElement('div');
+    div.className = 'chat-carregando';
+    div.id = 'chat-carregando';
+    div.appendChild(tplEnso.content.cloneNode(true));
+    lista.prepend(div);
+    lista.scrollTop = 0;
+  }
+
+  function esconderCarregando() {
+    const el = document.getElementById('chat-carregando');
+    if (el) el.remove();
+  }
+
+  function travar() {
+    input.disabled = true;
+    botaoEnviar.disabled = true;
+    botaoAnexar.disabled = true;
+    cta.hidden = false;
+  }
+
+  function limparAnexo() {
+    campoArquivo.value = '';
+    anexoChip.hidden = true;
+    anexoNome.textContent = '';
+  }
+
+  botaoAnexar.addEventListener('click', () => campoArquivo.click());
+
+  campoArquivo.addEventListener('change', () => {
+    const arquivo = campoArquivo.files[0];
+    if (!arquivo) return;
+    anexoNome.textContent = arquivo.name;
+    anexoChip.hidden = false;
+  });
+
+  anexoRemover.addEventListener('click', limparAnexo);
+
+  // Copiar / curtir / não curtir — um único listener pra tudo (delegação),
+  // porque os botões existem tanto nas mensagens renderizadas pelo servidor
+  // quanto nas que o JS cria depois; não precisa religar nada a cada envio.
+  lista.addEventListener('click', (ev) => {
+    const btnCopiar = ev.target.closest('.chat-acao--copiar');
+    if (btnCopiar) {
+      navigator.clipboard.writeText(btnCopiar.dataset.texto || '').then(() => {
+        btnCopiar.classList.add('chat-acao--feito');
+        setTimeout(() => btnCopiar.classList.remove('chat-acao--feito'), 1200);
+      }).catch(() => {
+        // API de clipboard pode falhar por permissão/foco — não falha em
+        // silêncio, mostra um sinal (mesmo que discreto) de que não copiou.
+        btnCopiar.classList.add('chat-acao--erro');
+        setTimeout(() => btnCopiar.classList.remove('chat-acao--erro'), 1200);
+      });
+      return;
+    }
+    const btnLike = ev.target.closest('.chat-acao--like');
+    if (btnLike) {
+      const grupo = btnLike.closest('.chat-acoes');
+      btnLike.classList.toggle('chat-acao--ativo');
+      grupo.querySelector('.chat-acao--dislike').classList.remove('chat-acao--ativo');
+      return;
+    }
+    const btnDislike = ev.target.closest('.chat-acao--dislike');
+    if (btnDislike) {
+      const grupo = btnDislike.closest('.chat-acoes');
+      btnDislike.classList.toggle('chat-acao--ativo');
+      grupo.querySelector('.chat-acao--like').classList.remove('chat-acao--ativo');
+    }
+  });
+
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const texto = input.value.trim();
+    const arquivo = campoArquivo.files[0] || null;
+    if (!texto && !arquivo) return;
+
+    let anexoInfo = null;
+    if (arquivo) {
+      const tipo = arquivo.type === 'application/pdf' ? 'pdf' : 'imagem';
+      anexoInfo = { tipo, nome: arquivo.name, arquivo };
+    }
+    mensagem(texto, 'usuario', anexoInfo);
+
+    input.value = '';
+    input.disabled = true;
+    botaoAnexar.disabled = true;
+    botaoEnviar.disabled = true;
+    limparAnexo();
+    mostrarCarregando();
+
+    try {
+      let r;
+      if (arquivo) {
+        const dadosForm = new FormData();
+        dadosForm.append('mensagem', texto);
+        dadosForm.append('arquivo', arquivo);
+        r = await fetch('{{ url_for("api_chat") }}', { method: 'POST', body: dadosForm });
+      } else {
+        r = await fetch('{{ url_for("api_chat") }}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mensagem: texto }),
+        });
+      }
+
+      let dados;
+      if (r.status === 413) {
+        dados = { erro: 'Arquivo muito grande (máximo 6MB).' };
+      } else {
+        dados = await r.json();
+      }
+
+      esconderCarregando();
+
+      if (dados.limite_sessao_atingido && !dados.resposta) {
+        travar();
+        return;
+      }
+      if (dados.erro) {
+        mensagem(dados.erro, 'agente');
+      } else {
+        mensagem(dados.resposta, 'agente');
+        const plural = dados.restantes === 1 ? 'mensagem restante' : 'mensagens restantes';
+        restantesEl.textContent = dados.restantes > 0
+          ? dados.restantes + ' ' + plural + ' nesta demonstração.'
+          : 'Você chegou ao limite da demonstração.';
+      }
+      if (dados.limite_sessao_atingido) {
+        travar();
+      } else {
+        input.disabled = false;
+        botaoAnexar.disabled = false;
+        botaoEnviar.disabled = false;
+        input.focus();
+      }
+    } catch (e) {
+      esconderCarregando();
+      mensagem('Não consegui falar com o servidor. Tente de novo.', 'agente');
+      input.disabled = false;
+      botaoAnexar.disabled = false;
+      botaoEnviar.disabled = false;
+    }
+  });
+</script>
+{% endblock %}

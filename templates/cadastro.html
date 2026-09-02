@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block titulo %}Criar conta · Sekai{% endblock %}
+
+{% block conteudo %}
+  <h1>Criar conta</h1>
+  <p class="sub">Um espaço, um agente, só seu.</p>
+
+  {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
+
+  <form method="post" novalidate>
+    <label for="email">E-mail</label>
+    <input id="email" name="email" type="email" value="{{ email }}" autocomplete="email" autofocus required>
+
+    <label for="senha">Senha <span class="dica">— mínimo 8 caracteres</span></label>
+    <input id="senha" name="senha" type="password" autocomplete="new-password" required>
+
+    <button type="submit">Criar conta</button>
+  </form>
+
+  <p class="rodape">Já tem conta? <a href="{{ url_for('login') }}">Entrar</a></p>
+{% endblock %}

@@ -1,0 +1,13 @@
+# Segredos — NUNCA versionar
+.env
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Assets de marca pesados (não usados pelo app; ele usa static/enso.svg)
+marca/sw_logo.png
+marca/sw_logo_name.png
+.claude/

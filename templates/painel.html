@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block titulo %}Painel · Sekai{% endblock %}
+
+{% block conteudo %}
+  <h1>Olá</h1>
+  <p class="sub">{{ g.usuario.email }}</p>
+  <p class="sub">Seu agente ainda não foi criado. É o próximo passo.</p>
+
+  <form method="post" action="{{ url_for('sair') }}">
+    <button type="submit" class="sair">Sair</button>
+  </form>
+{% endblock %}

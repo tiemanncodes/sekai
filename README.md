@@ -27,6 +27,8 @@ conta. Ao esbarrar no limite de mensagens, é convidado a se cadastrar.
 | Backend | Python 3 + Flask | Sem mágica: cada rota é explícita |
 | Banco | PostgreSQL (Supabase) via `psycopg` | SQL direto, sem ORM, para exercitar o SQL |
 | Modelos | OpenRouter (SDK `openai`) | Um único endpoint para vários provedores |
+| Embeddings | `fastembed` (ONNX, local) | Custo zero, sem chave e sem limite de taxa |
+| Banco vetorial | ChromaDB | Busca por similaridade sem subir mais infraestrutura |
 | Frontend | HTML + CSS + JS puro | Sem build step, sem dependência de framework |
 
 ## Decisões de engenharia
@@ -57,6 +59,24 @@ intervenção, porque o próximo da fila assumiu.
 próprio "pensamento em inglês" como resposta ao usuário. O parâmetro
 `reasoning: {enabled: false}` da OpenRouter resolve isso de forma unificada,
 enquanto o truque específico de cada modelo não funcionava para todos.
+
+**RAG com embeddings locais, e o modelo escolhido por medição.** A primeira
+versão despejava o PDF inteiro no prompt, truncado em 8.000 caracteres — não
+escala e enche o contexto de texto irrelevante. Hoje o documento é fatiado em
+trechos com sobreposição, indexado, e só os quatro trechos mais próximos da
+pergunta entram no prompt (economia medida de ~56% de contexto num teste).
+
+A escolha do modelo de embedding foi feita medindo, não por intuição, e as duas
+tentativas erradas ensinaram mais que a certa:
+
+| Modelo | Resultado |
+|---|---|
+| `bge-small-en` (inglês) | Separação de 0,096 entre frases não relacionadas em português — inútil |
+| `paraphrase-multilingual-MiniLM` | Resolveu a língua, mas acertou só 1 de 3 perguntas: modelos *paraphrase* comparam frases parecidas **entre si**, e RAG é assimétrico (pergunta curta contra trecho longo) |
+| `multilingual-e5-large` | Treinado para recuperação e com os prefixos `query:`/`passage:` obrigatórios: **4 de 4** |
+
+Os embeddings rodam **localmente**: os da OpenRouter são pagos, e o projeto
+inteiro parte da premissa de custo zero — a mesma razão do guardrail de modelos.
 
 **Markdown convertido no servidor e no cliente.** Mesmo instruído a não usar
 markdown, o modelo insiste em `**negrito**`. A conversão escapa todo o HTML
@@ -98,6 +118,15 @@ Acesse http://127.0.0.1:5000
 | `llm.py` | Cliente da OpenRouter: guardrail `:free` e cadeia de fallback |
 | `db.py` | Conexão com o Postgres (uma por request) |
 | `schema.sql` | Tabelas |
+
+## Limitações conhecidas
+
+- O índice vetorial é **em memória**: reiniciar o servidor apaga os documentos
+  já indexados. Aceitável para uma demonstração de 5 mensagens por sessão;
+  para produção, o caminho é `pgvector` no Postgres que o projeto já usa.
+- O modelo de embedding tem 2,2GB e leva ~15s para carregar na primeira vez.
+  O carregamento é preguiçoso — quem nunca anexa um documento nunca paga esse
+  custo.
 
 ## Próximos passos
 

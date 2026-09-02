@@ -21,6 +21,7 @@ from markupsafe import Markup, escape
 from psycopg.types.json import Jsonb
 from pypdf import PdfReader
 
+import rag
 from db import execute, query_one
 from llm import (
     CADEIA_FALLBACK_VISAO,
@@ -33,7 +34,11 @@ LIMITE_MENSAGENS_DIA = 5  # por IP, por dia — é o convite pro cadastro
 TAMANHO_MAXIMO_ARQUIVO = 6 * 1024 * 1024  # 6MB
 TIPOS_IMAGEM = {"image/png", "image/jpeg", "image/webp"}
 TIPO_PDF = "application/pdf"
-LIMITE_CARACTERES_PDF = 8000
+# Antes o PDF era truncado aqui e despejado inteiro no prompt. Com o RAG
+# (ver rag.py) o documento e indexado por inteiro e so os trechos relevantes
+# a pergunta entram no prompt — por isso o teto subiu tanto: ele agora existe
+# so para conter abuso, nao para caber no contexto do modelo.
+LIMITE_CARACTERES_PDF = 200_000
 
 SYSTEM_PROMPT = (
     "Você é o assistente de demonstração do Sekai, uma plataforma onde cada "
@@ -155,6 +160,31 @@ def _ler_arquivo(arquivo):
     return None, None, "Tipo de arquivo não aceito. Envie imagem (PNG/JPEG/WEBP) ou PDF."
 
 
+def _documento_id():
+    """Documentos sao indexados por sessao: a busca de um visitante nunca
+    alcanca o PDF de outro."""
+    return _estado()["token"]
+
+
+def _com_trechos_recuperados(pergunta, nome_arquivo=None):
+    """Monta o conteudo enviado ao modelo, colando antes da pergunta os
+    trechos do documento mais relevantes a ela (se houver documento)."""
+    trechos = rag.buscar(_documento_id(), pergunta)
+    if not trechos:
+        return pergunta
+
+    fonte = f' do arquivo "{nome_arquivo}"' if nome_arquivo else " do documento enviado"
+    contexto = "\n\n".join(
+        f"[trecho {i}]\n{t}" for i, t in enumerate(trechos, 1)
+    )
+    return (
+        f"Trechos{fonte}, recuperados por relevancia para a pergunta:\n\n"
+        f"{contexto}\n\n---\n\n"
+        f"Responda usando apenas os trechos acima. Se a resposta nao estiver "
+        f"neles, diga que nao encontrou no documento.\n\n{pergunta}"
+    )
+
+
 def enviar_mensagem(request, texto_usuario, arquivo=None):
     """Processa uma mensagem do chat público. Retorna um dict pronto pra JSON."""
     texto_usuario = (texto_usuario or "").strip()
@@ -184,13 +214,18 @@ def enviar_mensagem(request, texto_usuario, arquivo=None):
         ]
         cadeia = CADEIA_FALLBACK_VISAO
     elif tipo_arquivo == "pdf":
-        conteudo_modelo = (
-            f'Conteúdo do arquivo "{nome_arquivo}":\n\n{dado_arquivo}\n\n---\n\n'
-            + (texto_usuario or "Resuma esse documento.")
+        # Indexa o documento inteiro; a recuperacao abaixo escolhe o que de
+        # fato entra no prompt.
+        rag.indexar(_documento_id(), dado_arquivo)
+        conteudo_modelo = _com_trechos_recuperados(
+            texto_usuario or "Resuma esse documento.", nome_arquivo
         )
         cadeia = None
     else:
-        conteudo_modelo = texto_usuario
+        # Tambem recupera em perguntas sem anexo: e o que permite continuar
+        # perguntando sobre um PDF enviado antes. Sem isso o documento sumia
+        # do contexto depois do primeiro turno.
+        conteudo_modelo = _com_trechos_recuperados(texto_usuario)
         cadeia = None
 
     msgs.append({"role": "user", "content": conteudo_modelo})
